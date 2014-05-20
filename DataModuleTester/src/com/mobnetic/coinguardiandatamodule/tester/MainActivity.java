@@ -1,10 +1,10 @@
 package com.mobnetic.coinguardiandatamodule.tester;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import android.app.Activity;
 import android.os.Bundle;
-import android.text.Html;
 import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.view.View;
@@ -16,13 +16,10 @@ import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import com.android.volley.NetworkResponse;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
-import com.android.volley.Response.ErrorListener;
-import com.android.volley.Response.Listener;
 import com.android.volley.VolleyError;
-import com.android.volley.toolbox.HurlStack;
-import com.android.volley.toolbox.Volley;
 import com.mobnetic.coinguardian.config.MarketsConfig;
 import com.mobnetic.coinguardian.model.CheckerInfo;
 import com.mobnetic.coinguardian.model.Market;
@@ -36,7 +33,9 @@ import com.mobnetic.coinguardiandatamodule.tester.util.HttpsHelper;
 import com.mobnetic.coinguardiandatamodule.tester.util.MarketCurrencyPairsStore;
 import com.mobnetic.coinguardiandatamodule.tester.volley.CheckerErrorParsedError;
 import com.mobnetic.coinguardiandatamodule.tester.volley.CheckerVolleyMainRequest;
-import com.mobnetic.coinguardiandatamodule.tester.volley.CheckerVolleyMainRequest.TickerWithRawResponse;
+import com.mobnetic.coinguardiandatamodule.tester.volley.CheckerVolleyMainRequest.TickerWrapper;
+import com.mobnetic.coinguardiandatamodule.tester.volley.generic.ResponseErrorListener;
+import com.mobnetic.coinguardiandatamodule.tester.volley.generic.ResponseListener;
 
 public class MainActivity extends Activity {
 
@@ -57,7 +56,7 @@ public class MainActivity extends Activity {
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		
-		requestQueue = Volley.newRequestQueue(this, new HurlStack(null, HttpsHelper.getMySSLSocketFactory()));
+		requestQueue = HttpsHelper.newRequestQueue(this);
 		
 		setContentView(R.layout.main_activity);
 		
@@ -156,10 +155,11 @@ public class MainActivity extends Activity {
 		final boolean isCurrencyEmpty = getSelectedCurrencyBase()==null || getSelectedCurrencyCounter()==null;
 		currencySpinnersWrapper.setVisibility(isCurrencyEmpty ? View.GONE : View.VISIBLE);
 		dynamicCurrencyPairsWarningView.setVisibility(isCurrencyEmpty ? View.VISIBLE : View.GONE);
+		getResultButton.setVisibility(isCurrencyEmpty ? View.GONE : View.VISIBLE);
 	}
 	
 	private void refreshDynamicCurrencyPairsView(Market market) {
-		dynamicCurrencyPairsInfoView.setVisibility(market.getCurrencyPairsUrl()!=null ? View.VISIBLE : View.GONE);
+		dynamicCurrencyPairsInfoView.setVisibility(market.getCurrencyPairsUrl(0)!=null ? View.VISIBLE : View.GONE);
 	}
 	
 	private void refreshCurrencyBaseSpinner(Market market) {
@@ -209,30 +209,32 @@ public class MainActivity extends Activity {
 		final String currencyCounter = getSelectedCurrencyCounter();
 		final String pairId = currencyPairsMapHelper!=null ? currencyPairsMapHelper.getCurrencyPairId(currencyBase, currencyCounter) : null;
 		final CheckerInfo checkerInfo = new CheckerInfo(currencyBase, currencyCounter, pairId);
-		Request<?> request = new CheckerVolleyMainRequest(market, checkerInfo, new Listener<TickerWithRawResponse>() {
+		Request<?> request = new CheckerVolleyMainRequest(market, checkerInfo, new ResponseListener<TickerWrapper>() {
 			@Override
-			public void onResponse(TickerWithRawResponse ticker) {
-				handleNewResult(checkerInfo, ticker, null);
+			public void onResponse(String url, Map<String, String> requestHeaders, NetworkResponse networkResponse, String responseString, TickerWrapper tickerWrapper) {
+				handleNewResult(checkerInfo, tickerWrapper.ticker, url, requestHeaders, networkResponse, responseString, null, null);
 			}
-		}, new ErrorListener() {
+		}, new ResponseErrorListener() {
 			@Override
-			public void onErrorResponse(VolleyError error) {
+			public void onErrorResponse(String url, Map<String, String> requestHeaders, NetworkResponse networkResponse, String responseString, VolleyError error) {
 				error.printStackTrace();
 				
-				String errorMsg;
-				if(error instanceof CheckerErrorParsedError && !TextUtils.isEmpty(((CheckerErrorParsedError)error).getErrorMsg()))
+				String errorMsg = null;
+				if(error instanceof CheckerErrorParsedError) {
 					errorMsg = ((CheckerErrorParsedError)error).getErrorMsg();
-				else
+				}
+				
+				if(TextUtils.isEmpty(errorMsg))
 					errorMsg = CheckErrorsUtils.parseVolleyErrorMsg(MainActivity.this, error);
 					
-				handleNewResult(checkerInfo, null, errorMsg);
+				handleNewResult(checkerInfo, null, url, requestHeaders, networkResponse, responseString, errorMsg, error);
 			}
 		});
 		requestQueue.add(request);
 		showResultView(false);
 	}
 	
-	private void handleNewResult(CheckerInfo checkerInfo, TickerWithRawResponse ticker, String errorMsg) {
+	private void handleNewResult(CheckerInfo checkerInfo, Ticker ticker, String url, Map<String, String> requestHeaders, NetworkResponse networkResponse, String rawResponse, String errorMsg, VolleyError error) {
 		showResultView(true);
 		SpannableStringBuilder ssb = new SpannableStringBuilder();
 		
@@ -244,11 +246,11 @@ public class MainActivity extends Activity {
 			ssb.append(createNewPriceLineIfNeeded(R.string.ticker_ask, ticker.ask, checkerInfo.getCurrencyCounter()));
 			ssb.append(createNewPriceLineIfNeeded(R.string.ticker_vol, ticker.vol, checkerInfo.getCurrencyBase()));
 			ssb.append("\n"+getString(R.string.ticker_timestamp, FormatUtilsBase.formatSameDayTimeOrDate(this, ticker.timestamp)));
-			ssb.append("\n\n");
-			ssb.append(Html.fromHtml(getString(R.string.ticker_raw_response)+"<br\\><small>"+ticker.rawResponse+"</small>"));
 		} else {
 			ssb.append(getString(R.string.check_error_generic_prefix, errorMsg!=null ? errorMsg : "UNKNOWN"));
 		}
+		
+		CheckErrorsUtils.formatResponseDebug(this, ssb, url, requestHeaders, networkResponse, rawResponse, error);
 		
 		resultView.setText(ssb);
 	}

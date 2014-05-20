@@ -11,41 +11,35 @@ import com.mobnetic.coinguardian.model.Ticker;
 import com.mobnetic.coinguardian.model.currency.Currency;
 import com.mobnetic.coinguardian.model.currency.VirtualCurrency;
 
-public class Virtex extends Market {
+public class BtcMarkets extends Market {
 
-	private final static String NAME = "VirtEx";
-	private final static String TTS_NAME = NAME;
-	private final static String URL = "https://cavirtex.com/api2/ticker.json";
+	private final static String NAME = "BtcMarkets.net";
+	private final static String TTS_NAME = "BTC Markets net";
+	private final static String URL = "https://api.btcmarkets.net/market/%1$s/%2$s/tick";
 	private final static HashMap<String, CharSequence[]> CURRENCY_PAIRS = new LinkedHashMap<String, CharSequence[]>();
 	static {
 		CURRENCY_PAIRS.put(VirtualCurrency.BTC, new String[]{
-				Currency.CAD,
-				VirtualCurrency.LTC
+				Currency.AUD
 			});
 		CURRENCY_PAIRS.put(VirtualCurrency.LTC, new String[]{
-				Currency.CAD
+				Currency.AUD
 			});
 	}
 	
-	public Virtex() {
+	public BtcMarkets() {
 		super(NAME, TTS_NAME, CURRENCY_PAIRS);
 	}
-
+	
 	@Override
 	public String getUrl(int requestId, CheckerInfo checkerInfo) {
-		return URL;
+		return String.format(URL, checkerInfo.getCurrencyBase(), checkerInfo.getCurrencyCounter());
 	}
 	
 	@Override
 	protected void parseTickerFromJsonObject(int requestId, JSONObject jsonObject, Ticker ticker, CheckerInfo checkerInfo) throws Exception {
-		final JSONObject tickerJsonObject = jsonObject.getJSONObject("ticker");
-		final JSONObject pairJsonObject = tickerJsonObject.getJSONObject(checkerInfo.getCurrencyBase()+checkerInfo.getCurrencyCounter());
-		
-		ticker.bid = pairJsonObject.getDouble("buy");
-		ticker.ask = pairJsonObject.getDouble("sell");
-		ticker.vol = pairJsonObject.getDouble("volume");
-		ticker.high = pairJsonObject.getDouble("high");
-		ticker.low = pairJsonObject.getDouble("low");
-		ticker.last = pairJsonObject.getDouble("last");
+		ticker.bid = jsonObject.getDouble("bestBid");
+		ticker.ask = jsonObject.getDouble("bestAsk");
+		ticker.last = jsonObject.getDouble("lastPrice");
+		ticker.timestamp = jsonObject.getLong("timestamp");
 	}
 }

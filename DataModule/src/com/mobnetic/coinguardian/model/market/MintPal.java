@@ -31,6 +31,7 @@ public class MintPal extends Market {
 		CURRENCY_PAIRS.put(VirtualCurrency.DRK, new String[]{ VirtualCurrency.BTC });
 		CURRENCY_PAIRS.put(VirtualCurrency.EMO, new String[]{ VirtualCurrency.LTC });
 		CURRENCY_PAIRS.put(VirtualCurrency.FLT, new String[]{ VirtualCurrency.BTC });
+		CURRENCY_PAIRS.put(VirtualCurrency.HIRO, new String[]{ VirtualCurrency.BTC });
 		CURRENCY_PAIRS.put(VirtualCurrency.HVC, new String[]{ VirtualCurrency.BTC });
 		CURRENCY_PAIRS.put(VirtualCurrency.KARM, new String[]{ VirtualCurrency.LTC, VirtualCurrency.BTC });
 		CURRENCY_PAIRS.put(VirtualCurrency.KDC, new String[]{ VirtualCurrency.BTC });
@@ -86,12 +87,12 @@ public class MintPal extends Market {
 	// Get currency pairs
 	// ====================
 	@Override
-	public String getCurrencyPairsUrl() {
+	public String getCurrencyPairsUrl(int requestId) {
 		return URL_CURRENCY_PAIRS;
 	}
 	
 	@Override
-	protected void parseCurrencyPairs(String responseString, List<CurrencyPairInfo> pairs) throws Exception {
+	protected void parseCurrencyPairs(int requestId, String responseString, List<CurrencyPairInfo> pairs) throws Exception {
 		final JSONArray jsonArray = new JSONArray(responseString);
 		for(int i=0; i<jsonArray.length(); ++i) {
 			JSONObject marketObject = jsonArray.getJSONObject(i);

@@ -11,25 +11,15 @@ import com.mobnetic.coinguardian.model.CheckerInfo;
 import com.mobnetic.coinguardian.model.CurrencyPairInfo;
 import com.mobnetic.coinguardian.model.Market;
 import com.mobnetic.coinguardian.model.Ticker;
-import com.mobnetic.coinguardian.model.currency.Currency;
-import com.mobnetic.coinguardian.model.currency.VirtualCurrency;
 
-public class CoinDesk extends Market {
+public class CryptoAltex extends Market {
 
-	private final static String NAME = "CoinDesk";
-	private final static String TTS_NAME = "Coin Desk";
-	private final static String URL = "https://api.coindesk.com/v1/bpi/currentprice.json";
-	private final static String URL_CURRENCY_PAIRS = URL;
+	private final static String NAME = "CryptoAltex";
+	private final static String TTS_NAME = "Crypto Altex";
+	private final static String URL = "https://www.cryptoaltex.com/api/public_v2.php";
 	private final static HashMap<String, CharSequence[]> CURRENCY_PAIRS = new LinkedHashMap<String, CharSequence[]>();
-	static {
-		CURRENCY_PAIRS.put(VirtualCurrency.BTC, new String[]{
-				Currency.USD,
-				Currency.GBP,
-				Currency.EUR
-			});
-	}
 	
-	public CoinDesk() {
+	public CryptoAltex() {
 		super(NAME, TTS_NAME, CURRENCY_PAIRS);
 	}
 
@@ -40,9 +30,11 @@ public class CoinDesk extends Market {
 	
 	@Override
 	protected void parseTickerFromJsonObject(int requestId, JSONObject jsonObject, Ticker ticker, CheckerInfo checkerInfo) throws Exception {
-		final JSONObject bpiJsonObject = jsonObject.getJSONObject("bpi");
-		final JSONObject pairJsonObject = bpiJsonObject.getJSONObject(checkerInfo.getCurrencyCounter());
-		ticker.last = pairJsonObject.getDouble("rate_float");
+		final JSONObject pairObject = jsonObject.getJSONObject(checkerInfo.getCurrencyPairId());
+		ticker.vol = pairObject.getDouble("24_hours_volume");
+		ticker.high = pairObject.getDouble("24_hours_price_high");
+		ticker.low = pairObject.getDouble("24_hours_price_low");
+		ticker.last = pairObject.getDouble("last_trade");
 	}
 	
 	// ====================
@@ -50,16 +42,19 @@ public class CoinDesk extends Market {
 	// ====================
 	@Override
 	public String getCurrencyPairsUrl(int requestId) {
-		return URL_CURRENCY_PAIRS;
+		return URL;
 	}
 	
 	@Override
 	protected void parseCurrencyPairsFromJsonObject(int requestId, JSONObject jsonObject, List<CurrencyPairInfo> pairs) throws Exception {
-		final JSONObject bpiJsonObject = jsonObject.getJSONObject("bpi");
-		final JSONArray currencyCounterNames = bpiJsonObject.names();
+		final JSONArray pairsNamesArray = jsonObject.names();
 		
-		for(int i=0; i<currencyCounterNames.length(); ++i) {
-			pairs.add(new CurrencyPairInfo(VirtualCurrency.BTC, currencyCounterNames.getString(i), null));
+		for(int i=0; i<pairsNamesArray.length(); ++i) {
+			final String pairName = pairsNamesArray.getString(i);
+			final String[] split = pairName.split("/");
+			if(split!=null && split.length>=2) {
+				pairs.add(new CurrencyPairInfo(split[0], split[1], pairName));
+			}
 		}
 	}
 }

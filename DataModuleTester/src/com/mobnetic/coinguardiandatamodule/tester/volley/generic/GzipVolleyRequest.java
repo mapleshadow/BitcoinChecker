@@ -7,15 +7,18 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
+import org.apache.http.HttpStatus;
 import org.apache.http.protocol.HTTP;
 
 import com.android.volley.AuthFailureError;
 import com.android.volley.NetworkResponse;
 import com.android.volley.ParseError;
 import com.android.volley.Request;
+import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.Response.ErrorListener;
 import com.android.volley.Response.Listener;
+import com.android.volley.VolleyError;
 import com.android.volley.toolbox.HttpHeaderParser;
 import com.mobnetic.coinguardiandatamodule.tester.volley.CheckerErrorParsedError;
 import com.mobnetic.coinguardiandatamodule.tester.volley.UnknownVolleyError;
@@ -23,33 +26,87 @@ import com.mobnetic.coinguardiandatamodule.tester.volley.UnknownVolleyError;
 public abstract class GzipVolleyRequest<T> extends Request<T> {
 
 	private final Listener<T> listener;
+	private final ErrorListener errorListener;
 	private final Map<String, String> headers;
+	
+	private RequestQueue requestQueue;
+	private String redirectionUrl = null;
+	private int redirectionCount;
+	
+	private Map<String, String> requestHeaders;
+	private NetworkResponse networkResponse;
+	private String responseString;
+	
+	private final static int MAX_REDIRECTION_COUNT = 3;
 	
 	public GzipVolleyRequest(String url, Listener<T> listener, ErrorListener errorListener) {
 		super(Method.GET, url, errorListener);
 		
 		this.listener = listener;
+		this.errorListener = errorListener;
 		
 		this.headers = new HashMap<String, String>();
 		this.headers.put("Accept-Encoding", "gzip");
 		this.headers.put(HTTP.USER_AGENT, "Bitcoin Checker (gzip)");
 	}
 	
+	public RequestQueue getRequestQueue() {
+		return requestQueue;
+	}
+	
+	@Override
+	public String getUrl() {
+		if(redirectionUrl!=null)
+			return redirectionUrl;
+		return super.getUrl();
+	}
+	
 	@Override
     public Map<String, String> getHeaders() throws AuthFailureError {
-        return headers!=null ? headers : super.getHeaders();
+		requestHeaders = headers!=null ? headers : super.getHeaders();
+		return requestHeaders;
     }
 	
 	@Override
-	protected void deliverResponse(final T response) {
-		listener.onResponse(response);
+	public Request<?> setRequestQueue(RequestQueue requestQueue) {
+		this.requestQueue = requestQueue;
+		return super.setRequestQueue(requestQueue);
+	}
+
+	@Override
+	public void deliverError(VolleyError error) {
+		if(error!=null && error.networkResponse!=null) {
+			final int statusCode = error.networkResponse.statusCode;
+			if(statusCode==HttpStatus.SC_MOVED_PERMANENTLY || statusCode==HttpStatus.SC_MOVED_TEMPORARILY) {
+				String location = error.networkResponse.headers.get("Location");
+				if(location!=null && redirectionCount<MAX_REDIRECTION_COUNT) {
+					++redirectionCount;
+					redirectionUrl = location;
+					requestQueue.add(this);
+					return;
+				}
+			}
+		}
+		if(errorListener instanceof ResponseErrorListener)
+			((ResponseErrorListener)errorListener).onErrorResponse(getUrl(), requestHeaders, networkResponse, responseString, error);
+		else
+			super.deliverError(error);
 	}
 	
-	protected abstract T parseNetworkResponse(String responseString) throws Exception;
+	@Override
+	protected void deliverResponse(final T response) {
+		if(listener instanceof ResponseListener)
+			((ResponseListener<T>)listener).onResponse(getUrl(), requestHeaders, networkResponse, responseString, response);
+		else
+			listener.onResponse(response);
+	}
+	
+	protected abstract T parseNetworkResponse(Map<String, String> headers, String responseString) throws Exception;
 	
 	@Override
 	protected Response<T> parseNetworkResponse(NetworkResponse response) {
 		try {
+			networkResponse = response;
 			String responseString = "";
 			final String encoding = response.headers.get(HTTP.CONTENT_ENCODING);
             if(encoding!=null && encoding.contains("gzip")) {
@@ -57,9 +114,10 @@ public abstract class GzipVolleyRequest<T> extends Request<T> {
             } else {
                 responseString = new String(response.data, HttpHeaderParser.parseCharset(response.headers));
             }
-			return Response.success(parseNetworkResponse(responseString), HttpHeaderParser.parseCacheHeaders(response));
+            this.responseString = responseString;
+			return Response.success(parseNetworkResponse(response.headers, responseString), HttpHeaderParser.parseCacheHeaders(response));
 		} catch (CheckerErrorParsedError checkerErrorParsedError) {
-			return Response.error(checkerErrorParsedError);	
+			return Response.error(checkerErrorParsedError);
 		} catch (Exception e) {
 			return Response.error(new ParseError(e));
 		} catch (Throwable e) {
@@ -83,7 +141,7 @@ public abstract class GzipVolleyRequest<T> extends Request<T> {
 
             String readed;
             while ((readed = in.readLine()) != null) {
-                responseString += readed;
+                responseString += readed+"\n";
             }
         } catch (Exception e) {
             throw e;

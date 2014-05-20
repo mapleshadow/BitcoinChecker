@@ -1,8 +1,3 @@
-#NOTE: VACATIONS  
-####Until the end of March I'm on my winter vacations (abroad) without any internet connection:( During this time I won't be able to answer any issues, emails or pull requests.
-
-___  
-#Bitcoin Checker  
 __Bitcoin Checker__ is a FREE app to track the most recent prices of your favourite currency pairs (on over 30 supported exchanges) in many customizable ways (such as rich notifications, TTS voice announcements, Home and Lockscreen widget or multiple alarms).
 
 ###Hello Bitcoin Checker users!  
@@ -204,17 +199,19 @@ First thing is to provide provide url:
 URL_CURRENCY_PAIRS = "http://pubapi.cryptsy.com/api.php?method=marketdatav2";
 
 @Override
-public String getCurrencyPairsUrl() {
+public String getCurrencyPairsUrl(int requestId) {
 	return URL_CURRENCY_PAIRS;
 }
 ```
 Then you need to do parsing in:
 ```java
-protected void parseCurrencyPairsFromJsonObject(JSONObject jsonObject, List<CurrencyPairInfo> pairs)
+protected void parseCurrencyPairsFromJsonObject(int requestId, JSONObject jsonObject, List<CurrencyPairInfo> pairs)
 or
-protected void parseCurrencyPairs(String responseString, List<CurrencyPairInfo> pairs)
+protected void parseCurrencyPairs(int requestId, String responseString, List<CurrencyPairInfo> pairs)
 ```
-While parsing currency pairs you need to create [CurrencyPairInfo](https://github.com/mobnetic/BitcoinChecker/blob/master/DataModule/src/com/mobnetic/coinguardian/model/CurrencyPairInfo.java) and add it to `List<CurrencyPairInfo> pairs`. The last argument `pairId` is currently used only on Cryptsy, so just pass null on the exchanges.
+While parsing currency pairs you need to create [CurrencyPairInfo](https://github.com/mobnetic/BitcoinChecker/blob/master/DataModule/src/com/mobnetic/coinguardian/model/CurrencyPairInfo.java) and add it to `List<CurrencyPairInfo> pairs`. The last argument `pairId` is currently used only on Cryptsy, so just pass null on the exchanges.  
+
+You can also use multiple requests to fetch currency pairs from exchange - it is described in section [Multiple requests while fetching currency pairs](https://github.com/mobnetic/BitcoinChecker/blob/master/README.md#multiple-requests-while-fetching-currency-pairs).
 
 ##7. Enabling exchange:
 To enable a newly created exchange, you should add the corresponding line at the bottom of `MarketsConfig` file:
@@ -259,3 +256,13 @@ protected void parseTickerFromJsonObject(int requestId, JSONObject jsonObject, T
 	}
 }
 ```
+
+##Multiple requests while fetching currency pairs
+You can also use multiple requests support for fetching currency pairs from exchange. The implementation is almost identical - just override following method:  
+```java
+@Override
+public int getCurrencyPairsNumOfRequests() {
+	return 2;
+}
+```
+Then use the `requestId` argument in the same way as in previous section.

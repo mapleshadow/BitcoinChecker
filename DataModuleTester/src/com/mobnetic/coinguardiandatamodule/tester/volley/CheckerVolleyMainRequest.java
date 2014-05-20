@@ -1,51 +1,49 @@
 package com.mobnetic.coinguardiandatamodule.tester.volley;
 
+import java.util.Map;
+
 import android.text.TextUtils;
 
 import com.android.volley.DefaultRetryPolicy;
-import com.android.volley.Request;
-import com.android.volley.RequestQueue;
 import com.android.volley.Response.ErrorListener;
 import com.android.volley.Response.Listener;
 import com.android.volley.toolbox.RequestFuture;
 import com.mobnetic.coinguardian.model.CheckerInfo;
 import com.mobnetic.coinguardian.model.Market;
 import com.mobnetic.coinguardian.model.Ticker;
-import com.mobnetic.coinguardiandatamodule.tester.volley.CheckerVolleyMainRequest.TickerWithRawResponse;
+import com.mobnetic.coinguardiandatamodule.tester.volley.CheckerVolleyMainRequest.TickerWrapper;
 import com.mobnetic.coinguardiandatamodule.tester.volley.generic.GenericCheckerVolleyRequest;
 
-public class CheckerVolleyMainRequest extends GenericCheckerVolleyRequest<TickerWithRawResponse> {
+public class CheckerVolleyMainRequest extends GenericCheckerVolleyRequest<TickerWrapper> {
 	
 	private final Market market;
-	private RequestQueue requestQueue;
 
-	public CheckerVolleyMainRequest(Market market, CheckerInfo checkerInfo, Listener<TickerWithRawResponse> listener, ErrorListener errorListener) {
+	public CheckerVolleyMainRequest(Market market, CheckerInfo checkerInfo, Listener<TickerWrapper> listener, ErrorListener errorListener) {
 		super(market.getUrl(0, checkerInfo), checkerInfo, listener, errorListener);
 		setRetryPolicy(new DefaultRetryPolicy(5000, 3, 1.5f));
 		this.market = market;
 	}
 	
 	@Override
-	public Request<?> setRequestQueue(RequestQueue requestQueue) {
-		this.requestQueue = requestQueue;
-		return super.setRequestQueue(requestQueue);
-	}
-
-	@Override
-	protected TickerWithRawResponse parseNetworkResponse(String responseString) throws Exception {
-		TickerWithRawResponse ticker;
+	protected TickerWrapper parseNetworkResponse(Map<String, String> headers, String responseString) throws Exception {
+		TickerWrapper tickerWrapper = new TickerWrapper();
 		try {
-			ticker = (TickerWithRawResponse)market.parseTickerMain(0, responseString, new TickerWithRawResponse(), checkerInfo);
+			tickerWrapper.ticker = market.parseTickerMain(0, responseString, new Ticker(), checkerInfo);
 		} catch (Exception e) {
 			e.printStackTrace();
-			ticker = null;
+			tickerWrapper.ticker = null;
 		}
 		
-		if(ticker==null || ticker.last<=Ticker.NO_DATA) {
-			throw new CheckerErrorParsedError(market.parseErrorMain(0, responseString, checkerInfo));
+		if(tickerWrapper.ticker==null || tickerWrapper.ticker.last<=Ticker.NO_DATA) {
+			String errorMsg;
+			try {
+				errorMsg = market.parseErrorMain(0, responseString, checkerInfo);
+			} catch (Exception e) {
+				errorMsg = null;
+			}
+			throw new CheckerErrorParsedError(errorMsg);
 		}
 		
-		ticker.rawResponse = responseString;
 		final int numOfRequests = market.getNumOfRequests(checkerInfo);
 		if(numOfRequests>1) {
 			for(int requestId=1; requestId<numOfRequests; ++requestId) {
@@ -54,21 +52,21 @@ public class CheckerVolleyMainRequest extends GenericCheckerVolleyRequest<Ticker
 					final String nextUrl = market.getUrl(requestId, checkerInfo);
 					if(!TextUtils.isEmpty(nextUrl)) {
 						CheckerVolleyNextRequest request = new CheckerVolleyNextRequest(nextUrl, checkerInfo, future);
-						requestQueue.add(request);
+						getRequestQueue().add(request);
 						String nextResponse = future.get(); // this will block
-						market.parseTickerMain(requestId, nextResponse, ticker, checkerInfo);
+						market.parseTickerMain(requestId, nextResponse, tickerWrapper.ticker, checkerInfo);
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
 			}
 		}
-		return ticker;
+		return tickerWrapper;
 	}
 	
-	public class TickerWithRawResponse extends Ticker {
+	public class TickerWrapper {
 		
-		public String rawResponse;
+		public Ticker ticker;
 		
 	}
 }

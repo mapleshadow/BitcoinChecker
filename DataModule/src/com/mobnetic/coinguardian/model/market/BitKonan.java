@@ -11,41 +11,42 @@ import com.mobnetic.coinguardian.model.Ticker;
 import com.mobnetic.coinguardian.model.currency.Currency;
 import com.mobnetic.coinguardian.model.currency.VirtualCurrency;
 
-public class Virtex extends Market {
+public class BitKonan extends Market {
 
-	private final static String NAME = "VirtEx";
-	private final static String TTS_NAME = NAME;
-	private final static String URL = "https://cavirtex.com/api2/ticker.json";
+	private final static String NAME = "BitKonan";
+	private final static String TTS_NAME = "Bit Konan";
+	private final static String URL_BTC = "https://bitkonan.com/api/ticker";
+	private final static String URL_LTC = "https://bitkonan.com/api/ltc_ticker";
 	private final static HashMap<String, CharSequence[]> CURRENCY_PAIRS = new LinkedHashMap<String, CharSequence[]>();
 	static {
 		CURRENCY_PAIRS.put(VirtualCurrency.BTC, new String[]{
-				Currency.CAD,
-				VirtualCurrency.LTC
+				Currency.USD
 			});
 		CURRENCY_PAIRS.put(VirtualCurrency.LTC, new String[]{
-				Currency.CAD
+				Currency.USD
 			});
 	}
 	
-	public Virtex() {
+	public BitKonan() {
 		super(NAME, TTS_NAME, CURRENCY_PAIRS);
 	}
-
+	
 	@Override
 	public String getUrl(int requestId, CheckerInfo checkerInfo) {
-		return URL;
+		if(VirtualCurrency.BTC.equals(checkerInfo.getCurrencyBase())) {
+			return URL_BTC;
+		} else {
+			return URL_LTC;
+		}
 	}
 	
 	@Override
 	protected void parseTickerFromJsonObject(int requestId, JSONObject jsonObject, Ticker ticker, CheckerInfo checkerInfo) throws Exception {
-		final JSONObject tickerJsonObject = jsonObject.getJSONObject("ticker");
-		final JSONObject pairJsonObject = tickerJsonObject.getJSONObject(checkerInfo.getCurrencyBase()+checkerInfo.getCurrencyCounter());
-		
-		ticker.bid = pairJsonObject.getDouble("buy");
-		ticker.ask = pairJsonObject.getDouble("sell");
-		ticker.vol = pairJsonObject.getDouble("volume");
-		ticker.high = pairJsonObject.getDouble("high");
-		ticker.low = pairJsonObject.getDouble("low");
-		ticker.last = pairJsonObject.getDouble("last");
+		ticker.bid = jsonObject.getDouble("bid");
+		ticker.ask = jsonObject.getDouble("ask");
+		ticker.vol = jsonObject.getDouble("volume");
+		ticker.high = jsonObject.getDouble("high");
+		ticker.low = jsonObject.getDouble("low");
+		ticker.last = jsonObject.getDouble("last");
 	}
 }

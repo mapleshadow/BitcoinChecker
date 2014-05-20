@@ -96,6 +96,7 @@ public class VirtualCurrency {
 	public static final String ECN = "ECN";
 	public static final String ELC = "ELC";
 	public static final String ELP = "ELP";
+	public static final String EMC2 = "EMC2";
 	public static final String EMD = "EMD";
 	public static final String EMO = "EMO";
 	public static final String ETOK = "ETOK";
@@ -134,6 +135,7 @@ public class VirtualCurrency {
 	public static final String GRUMP = "GRUMP";
 	public static final String HBN = "HBN";
 	public static final String HEX = "HEX";
+	public static final String HIRO = "HIRO";
 	public static final String HRO = "HRO";
 	public static final String HUC = "HUC";
 	public static final String HVC = "HVC";
@@ -158,6 +160,7 @@ public class VirtualCurrency {
 	public static final String LDC = "LDC";
 	public static final String LEAF = "LEAF";
 	public static final String LGBT = "LGBT";
+	public static final String LGC = "LGC";
 	public static final String LK7 = "LK7";
 	public static final String LKY = "LKY";
 	public static final String LMC = "LMC";
@@ -217,6 +220,7 @@ public class VirtualCurrency {
 	public static final String PHI = "PHI";
 	public static final String PHS = "PHS";
 	public static final String PIC = "PIC";
+	public static final String PLC = "PLC";
 	public static final String PLT = "PLT";
 	public static final String PMC = "PMC";
 	public static final String PND = "PND";
